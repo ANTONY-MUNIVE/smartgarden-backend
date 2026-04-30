@@ -85,8 +85,18 @@ railway deploy
 
 ### Opción 2: Render
 1. Conecta repositorio a Render
-2. Configura `Start Command`: `uvicorn src.main:app --host 0.0.0.0 --port $PORT`
-3. Agrega variables de entorno
+2. El archivo `render.yaml` ya deja listo el servicio web
+3. Agrega variables de entorno en Render
+4. Verifica el despliegue en `https://TU-APP.onrender.com/health`
+
+La respuesta esperada debe ser similar a:
+```json
+{
+    "status": "ok",
+    "service": "Smart Garden School API",
+    "environment": "production"
+}
+```
 
 ### Opción 3: Heroku
 ```bash

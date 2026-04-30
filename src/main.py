@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.infrastructure.api.routes import router as api_router
@@ -5,10 +7,13 @@ from src.ia.motor_ia import router as ia_router
 
 app = FastAPI(title="Smart Garden School API")
 
+frontend_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+allowed_origins = [origin.strip() for origin in frontend_origins.split(",") if origin.strip()]
+
 # Configure CORS for the React frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # En producción, limitar al frontend
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,6 +29,16 @@ app.include_router(ia_router)
 async def root():
     return {"message": "Welcome to Smart Garden School API"}
 
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "ok",
+        "service": "Smart Garden School API",
+        "environment": os.getenv("ENVIRONMENT", "production"),
+    }
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run(app, host="0.0.0.0", port=port)
