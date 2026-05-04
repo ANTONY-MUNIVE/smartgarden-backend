@@ -118,10 +118,13 @@ class PrediccionesIA:
                 "uv_index": 6 if luminosidad_actual >= 700 else 4,
             })
 
+            # Usar timestamps ISO para que ClimaService.calcular_horas_luz pueda parsearlos
+            salida_iso = f"{fecha}T{(6 + (i % 2)):02d}:00:00"
+            puesta_iso = f"{fecha}T{(18 - (1 if i % 3 == 0 else 0)):02d}:00:00"
             horarios_sol.append({
                 "fecha": fecha,
-                "salida_sol": f"{6 + (i % 2):02d}:00",
-                "puesta_sol": f"{18 - (1 if i % 3 == 0 else 0):02d}:00",
+                "salida_sol": salida_iso,
+                "puesta_sol": puesta_iso,
             })
 
         return {
