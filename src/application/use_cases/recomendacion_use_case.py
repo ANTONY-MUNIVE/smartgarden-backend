@@ -17,3 +17,18 @@ class RecomendacionUseCase:
             return self.repository.aplicar(rec_id)
         except OperationalError:
             return None
+
+    def crear_recomendacion(self, data: dict):
+        """Crea y guarda una nueva recomendación en la persistencia."""
+        try:
+            rec = Recomendacion(
+                prioridad=data.get("prioridad", "media"),
+                accion=data.get("accion", ""),
+                descripcion=data.get("descripcion"),
+                variable=data.get("variable"),
+                icono=data.get("icono", "💡"),
+                confianza=data.get("confianza"),
+            )
+            return self.repository.save(rec)
+        except OperationalError:
+            return None

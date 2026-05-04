@@ -77,6 +77,15 @@ class ConfigRequest(BaseModel):
     cultivo_actual: Optional[str] = None
     etapa_actual: Optional[str] = None
 
+
+class RecomendacionCreateRequest(BaseModel):
+    prioridad: str = 'media'
+    accion: str
+    descripcion: Optional[str] = None
+    variable: Optional[str] = None
+    icono: Optional[str] = '💡'
+    confianza: Optional[float] = None
+
 # ─── Dependency injection ─────────────────────────────────────────────────────
 
 def get_user_uc():
@@ -173,6 +182,14 @@ async def create_alerta(data: dict, uc: AlertaUseCase = Depends(get_alerta_uc)):
 @router.get("/recomendaciones")
 async def get_recomendaciones(uc: RecomendacionUseCase = Depends(get_recomendacion_uc)):
     return [r.to_dict() for r in uc.obtener_recomendaciones()]
+
+
+@router.post("/recomendaciones")
+async def create_recomendacion(req: RecomendacionCreateRequest, uc: RecomendacionUseCase = Depends(get_recomendacion_uc)):
+    result = uc.crear_recomendacion(req.dict())
+    if not result:
+        raise HTTPException(status_code=503, detail="No se pudo crear la recomendación (BD no disponible)")
+    return result.to_dict()
 
 @router.patch("/recomendaciones/{rec_id}/aplicar")
 async def aplicar_recomendacion(rec_id: int, uc: RecomendacionUseCase = Depends(get_recomendacion_uc)):
