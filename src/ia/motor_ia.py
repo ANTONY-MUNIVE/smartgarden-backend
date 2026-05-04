@@ -179,11 +179,20 @@ def horarios_sol(datos: DatosHuerto) -> Dict:
         
         horarios = predicciones.clima_service.calcular_horas_luz(clima["horarios_sol"])
         
+        if horarios and len(horarios) > 0:
+            promedio = round(sum([h.get("horas_luz", 0) for h in horarios]) / len(horarios), 1)
+            mejor = max(horarios, key=lambda x: x.get("horas_luz", 0))
+            peor = min(horarios, key=lambda x: x.get("horas_luz", 0))
+        else:
+            promedio = 0
+            mejor = None
+            peor = None
+
         return {
             "horarios_proximos_7_dias": horarios,
-            "promedio_horas_luz": round(sum([h["horas_luz"] for h in horarios]) / len(horarios), 1),
-            "mejor_dia": max(horarios, key=lambda x: x["horas_luz"]),
-            "peor_dia": min(horarios, key=lambda x: x["horas_luz"])
+            "promedio_horas_luz": promedio,
+            "mejor_dia": mejor,
+            "peor_dia": peor
         }
     except Exception as e:
         return {"error": f"Error al obtener horarios: {str(e)}"}

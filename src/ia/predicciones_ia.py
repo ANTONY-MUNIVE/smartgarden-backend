@@ -206,7 +206,11 @@ class PrediccionesIA:
             recomendaciones.extend(riesgo_enfermedad["recomendaciones"][:2])
         
         # Por luz
-        horas_luz_promedio = sum([h["horas_luz"] for h in horarios_sol]) / len(horarios_sol)
+        if horarios_sol and len(horarios_sol) > 0:
+            horas_luz_promedio = sum([h.get("horas_luz", 0) for h in horarios_sol]) / len(horarios_sol)
+        else:
+            horas_luz_promedio = 0
+
         if horas_luz_promedio < 8:
             recomendaciones.append(f"☀️ Luz insuficiente ({horas_luz_promedio:.1f}h/día). Ajustar sombra.")
         
