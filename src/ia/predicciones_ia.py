@@ -37,7 +37,12 @@ class PrediccionesIA:
         clima = self.clima_service.obtener_clima_actual(self.lat, self.lon)
         
         if clima["status"] != "ok":
-            return {"error": "No se pudo obtener datos de clima"}
+            clima = self._clima_fallback(
+                humedad_suelo_actual,
+                temperatura_actual,
+                luminosidad_actual,
+                humedad_aire_actual,
+            )
         
         # 2. Calcular necesidad de riego
         calendario_riegos = self._calcular_riegos(
@@ -79,6 +84,61 @@ class PrediccionesIA:
                 riesgo_enfermedad,
                 horarios_sol
             ),
+        }
+
+    def _clima_fallback(self,
+                        humedad_suelo_actual: float,
+                        temperatura_actual: float,
+                        luminosidad_actual: float,
+                        humedad_aire_actual: float) -> Dict:
+        """Genera un clima sintético cuando Open-Meteo no responde."""
+        hoy = datetime.now()
+
+        def limitar(valor: float, minimo: float, maximo: float) -> float:
+            return max(minimo, min(maximo, valor))
+
+        pronostico = []
+        horarios_sol = []
+
+        for i in range(7):
+            fecha = (hoy + timedelta(days=i)).date().isoformat()
+            variacion_temp = (-1.2 if i % 3 == 0 else 0.6 if i % 2 == 0 else 1.0)
+            variacion_lluvia = 0.2 if humedad_aire_actual > 75 else 0.0
+            temp_max = limitar(temperatura_actual + variacion_temp + (i * 0.2), -5, 45)
+            temp_min = limitar(temp_max - 6, -8, 35)
+            precipitacion = round(variacion_lluvia + (0.3 if humedad_suelo_actual < 40 and i in (2, 5) else 0.0), 1)
+
+            pronostico.append({
+                "fecha": fecha,
+                "temp_max": round(temp_max, 1),
+                "temp_min": round(temp_min, 1),
+                "precipitacion": precipitacion,
+                "codigo_clima": 3 if luminosidad_actual < 500 else 2,
+                "descripcion": "Datos locales estimados",
+                "uv_index": 6 if luminosidad_actual >= 700 else 4,
+            })
+
+            horarios_sol.append({
+                "fecha": fecha,
+                "salida_sol": f"{6 + (i % 2):02d}:00",
+                "puesta_sol": f"{18 - (1 if i % 3 == 0 else 0):02d}:00",
+            })
+
+        return {
+            "status": "ok",
+            "actual": {
+                "temperatura": round(temperatura_actual, 1),
+                "humedad": round(humedad_aire_actual, 1),
+                "codigo_clima": 2,
+                "velocidad_viento": 8,
+                "descripcion": "Datos locales estimados",
+                "uv_index": 6 if luminosidad_actual >= 700 else 4,
+            },
+            "pronostico_7_dias": pronostico,
+            "horarios_sol": horarios_sol,
+            "lat": self.lat,
+            "lon": self.lon,
+            "fallback": True,
         }
     
     def _calcular_riegos(self, humedad_suelo_actual: float, pronostico: List[Dict]) -> List[Dict]:
