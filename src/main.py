@@ -7,13 +7,17 @@ from src.ia.motor_ia import router as ia_router
 
 app = FastAPI(title="Smart Garden School API")
 
-frontend_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+frontend_origins = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,https://smartgarden-frontend.vercel.app",
+)
 allowed_origins = [origin.strip() for origin in frontend_origins.split(",") if origin.strip()]
 
 # Configure CORS for the React frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

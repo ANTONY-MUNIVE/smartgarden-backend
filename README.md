@@ -89,6 +89,11 @@ railway deploy
 3. Agrega variables de entorno en Render
 4. Verifica el despliegue en `https://TU-APP.onrender.com/health`
 
+En Render configura al menos esta variable:
+```env
+CORS_ORIGINS=https://smartgarden-frontend.vercel.app,http://localhost:3000
+```
+
 La respuesta esperada debe ser similar a:
 ```json
 {
