@@ -48,6 +48,49 @@ def recomendar(datos: DatosHuerto):
     }
 
 
+@router.post("/predecir")
+def predecir(datos: DatosHuerto) -> Dict:
+    """Compatibilidad con el frontend antiguo que esperaba una predicción simple."""
+    try:
+        resultado = obtener_prediccion_completa(
+            humedad_suelo=datos.humedad_suelo,
+            temperatura=datos.temperatura,
+            luz=datos.luz,
+            humedad_aire=datos.humedad_aire,
+            lat=datos.latitude,
+            lon=datos.longitude,
+        )
+
+        calendario = resultado.get("calendario_riegos", [])
+        primer_dia = calendario[0] if calendario else {}
+        necesidad = primer_dia.get("necesidad", "MEDIA")
+
+        ajuste_por_necesidad = {
+            "URGENTE": -12,
+            "ALTA": -8,
+            "MEDIA": -4,
+            "BAJA": 2,
+        }
+
+        humedad_predicha = max(
+            0,
+            min(
+                100,
+                round(
+                    datos.humedad_suelo + ajuste_por_necesidad.get(necesidad, -2)
+                ),
+            ),
+        )
+
+        return {
+            "humedad_futura_predicha": humedad_predicha,
+            "mensaje": "Predicción generada por compatibilidad con el frontend.",
+            **resultado,
+        }
+    except Exception as e:
+        return {"error": f"Error en predicción: {str(e)}"}
+
+
 # DEPRECATED: Endpoint /predecir removido
 # - Reemplazado por /prediccion-completa (más completo)
 # - El modelo_humedad.pkl ya no se usa
