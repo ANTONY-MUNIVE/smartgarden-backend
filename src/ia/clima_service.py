@@ -132,18 +132,51 @@ class ClimaService:
         """Calcula horas de luz solar disponibles."""
         horas_luz = []
         for dia in horarios_sol:
+            salida_raw = dia.get("salida_sol") or dia.get("salida")
+            puesta_raw = dia.get("puesta_sol") or dia.get("puesta")
+            fecha_str = dia.get("fecha")
+
+            salida = None
+            puesta = None
+
+            # Intentar parseo ISO completo
             try:
-                salida = datetime.fromisoformat(dia["salida_sol"])
-                puesta = datetime.fromisoformat(dia["puesta_sol"])
-                horas = (puesta - salida).total_seconds() / 3600
-                horas_luz.append({
-                    "fecha": dia["fecha"],
-                    "horas_luz": round(horas, 1),
-                    "salida": salida.strftime("%H:%M"),
-                    "puesta": puesta.strftime("%H:%M"),
-                })
-            except:
-                pass
+                if isinstance(salida_raw, str):
+                    salida = datetime.fromisoformat(salida_raw)
+            except Exception:
+                salida = None
+
+            try:
+                if isinstance(puesta_raw, str):
+                    puesta = datetime.fromisoformat(puesta_raw)
+            except Exception:
+                puesta = None
+
+            # Si no tenemos date-time completos, intentar combinar fecha + hora (formato HH:MM)
+            if (salida is None or puesta is None) and fecha_str:
+                try:
+                    if salida is None and isinstance(salida_raw, str) and len(salida_raw) <= 8:
+                        salida = datetime.fromisoformat(f"{fecha_str}T{salida_raw if ':' in salida_raw else salida_raw + ':00'}")
+                except Exception:
+                    salida = None
+
+                try:
+                    if puesta is None and isinstance(puesta_raw, str) and len(puesta_raw) <= 8:
+                        puesta = datetime.fromisoformat(f"{fecha_str}T{puesta_raw if ':' in puesta_raw else puesta_raw + ':00'}")
+                except Exception:
+                    puesta = None
+
+            # Si aún faltan valores, omitir este día
+            if not salida or not puesta:
+                continue
+
+            horas = (puesta - salida).total_seconds() / 3600
+            horas_luz.append({
+                "fecha": fecha_str,
+                "horas_luz": round(horas, 1),
+                "salida": salida.strftime("%H:%M"),
+                "puesta": puesta.strftime("%H:%M"),
+            })
         return horas_luz
     
     @staticmethod
