@@ -3,7 +3,9 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Dict
 from .predicciones_ia import obtener_prediccion_completa, PrediccionesIA
-
+from fastapi import Depends
+from src.domain.ports.ia_port import IAPort
+from src.ia.adapters.openmeteo_ia_adapter import OpenMeteoIAAdapter
 router = APIRouter(prefix="/api/ia", tags=["IA"])
 
 class DatosHuerto(BaseModel):
@@ -13,6 +15,16 @@ class DatosHuerto(BaseModel):
     humedad_aire: float
     latitude: float = -12.0  # Default: Lima, Perú
     longitude: float = -77.0
+
+# ─── Inyección de dependencia para el adaptador IA ────────────────────────────
+
+def get_ia_adapter() -> IAPort:
+    """Provee la implementación del puerto IAPort.
+    
+    Actualmente usa OpenMeteoIAAdapter.
+    Puede ser reemplazado por otro adaptador sin cambiar las rutas.
+    """
+    return OpenMeteoIAAdapter()
 
 def generar_recomendacion(datos: DatosHuerto):
     recomendaciones = []
@@ -49,16 +61,16 @@ def recomendar(datos: DatosHuerto):
 
 
 @router.post("/predecir")
-def predecir(datos: DatosHuerto) -> Dict:
+def predecir(datos: DatosHuerto, ia: IAPort = Depends(get_ia_adapter)) -> Dict:
     """Compatibilidad con el frontend antiguo que esperaba una predicción simple."""
     try:
-        resultado = obtener_prediccion_completa(
+        resultado = ia.predecir_completo(
             humedad_suelo=datos.humedad_suelo,
             temperatura=datos.temperatura,
             luz=datos.luz,
             humedad_aire=datos.humedad_aire,
-            lat=datos.latitude,
-            lon=datos.longitude,
+            latitude=datos.latitude,
+            longitude=datos.longitude,
         )
 
         calendario = resultado.get("calendario_riegos", [])
@@ -97,7 +109,7 @@ def predecir(datos: DatosHuerto) -> Dict:
 # - Usar obtenerPrediccionCompleta() en su lugar
 
 @router.post("/prediccion-completa")
-def prediccion_completa(datos: DatosHuerto) -> Dict:
+def prediccion_completa(datos: DatosHuerto, ia: IAPort = Depends(get_ia_adapter)) -> Dict:
     """
     🚀 NUEVA CARACTERÍSTICA: Análisis predictivo completo
     
@@ -110,33 +122,25 @@ def prediccion_completa(datos: DatosHuerto) -> Dict:
     
     Usa API de clima gratuita (Open-Meteo, sin API key)
     """
-    try:
-        resultado = obtener_prediccion_completa(
-            humedad_suelo=datos.humedad_suelo,
-            temperatura=datos.temperatura,
-            luz=datos.luz,
-            humedad_aire=datos.humedad_aire,
-            lat=datos.latitude,
-            lon=datos.longitude
-        )
-        return resultado
-    except Exception as e:
-        return {
-            "error": f"Error en análisis predictivo: {str(e)}",
-            "recomendacion": "Verifica conexión a internet y que la ubicación sea válida"
-        }
+    return ia.predecir_completo(
+        humedad_suelo=datos.humedad_suelo,
+        temperatura=datos.temperatura,
+        luz=datos.luz,
+        humedad_aire=datos.humedad_aire,
+        latitude=datos.latitude,
+        longitude=datos.longitude
+    )
 
 @router.post("/calendario-riegos")
-def calendario_riegos(datos: DatosHuerto) -> Dict:
+def calendario_riegos(datos: DatosHuerto, ia: IAPort = Depends(get_ia_adapter)) -> Dict:
     """Obtiene calendario optimizado de riegos para 7 días."""
     try:
-        predicciones = PrediccionesIA(datos.latitude, datos.longitude)
-        clima = predicciones.clima_service.obtener_clima_actual(datos.latitude, datos.longitude)
+        clima = ia.obtener_clima_actual(datos.latitude, datos.longitude)
         
         if clima["status"] != "ok":
             return {"error": "No se pudo obtener datos de clima"}
         
-        calendario = predicciones._calcular_riegos(datos.humedad_suelo, clima["pronostico_7_dias"])
+        calendario = ia.calcular_riegos(datos.humedad_suelo, clima["pronostico_7_dias"])
         
         return {
             "calendario_riegos": calendario,
@@ -147,37 +151,24 @@ def calendario_riegos(datos: DatosHuerto) -> Dict:
         return {"error": f"Error al calcular calendario: {str(e)}"}
 
 @router.post("/riesgo-enfermedades")
-def riesgo_enfermedades(datos: DatosHuerto) -> Dict:
+def riesgo_enfermedades(datos: DatosHuerto, ia: IAPort = Depends(get_ia_adapter)) -> Dict:
     """Predice riesgo de enfermedades basado en clima."""
-    try:
-        from .enfermedades_modelo import modelo_enfermedades
-        
-        predicciones = PrediccionesIA(datos.latitude, datos.longitude)
-        clima = predicciones.clima_service.obtener_clima_actual(datos.latitude, datos.longitude)
-        
-        riesgo = modelo_enfermedades.predecir_riesgo_enfermedad(
-            humedad_suelo=datos.humedad_suelo,
-            humedad_aire=clima["actual"]["humedad"],
-            temperatura=clima["actual"]["temperatura"],
-            precipitacion_proxima=clima["pronostico_7_dias"][0]["precipitacion"]
-        )
-        
-        return {
-            **riesgo,
-            "clima_actual": clima["actual"],
-            "pronostico_proxima_lluvia": clima["pronostico_7_dias"][0]
-        }
-    except Exception as e:
-        return {"error": f"Error en análisis de enfermedad: {str(e)}"}
+    return ia.predecir_enfermedades(
+        humedad_suelo=datos.humedad_suelo,
+        humedad_aire=0.0,  # Se obtendrá del clima
+        temperatura=datos.temperatura,
+        precipitacion=0.0,  # Se obtendrá del pronóstico
+        latitude=datos.latitude,
+        longitude=datos.longitude
+    )
 
 @router.post("/horarios-sol")
-def horarios_sol(datos: DatosHuerto) -> Dict:
+def horarios_sol(datos: DatosHuerto, ia: IAPort = Depends(get_ia_adapter)) -> Dict:
     """Obtiene horarios de salida/puesta de sol y horas de luz útil."""
     try:
-        predicciones = PrediccionesIA(datos.latitude, datos.longitude)
-        clima = predicciones.clima_service.obtener_clima_actual(datos.latitude, datos.longitude)
+        clima = ia.obtener_clima_actual(datos.latitude, datos.longitude)
         
-        horarios = predicciones.clima_service.calcular_horas_luz(clima["horarios_sol"])
+        horarios = ia.calcular_horas_luz(clima.get("horarios_sol", []))
         
         if horarios and len(horarios) > 0:
             promedio = round(sum([h.get("horas_luz", 0) for h in horarios]) / len(horarios), 1)
@@ -198,18 +189,17 @@ def horarios_sol(datos: DatosHuerto) -> Dict:
         return {"error": f"Error al obtener horarios: {str(e)}"}
 
 @router.get("/clima-actual")
-def clima_actual(latitude: float = -12.0, longitude: float = -77.0) -> Dict:
+def clima_actual(latitude: float = -12.0, longitude: float = -77.0, ia: IAPort = Depends(get_ia_adapter)) -> Dict:
     """Obtiene clima actual y alertas sin consumir datos del sensor."""
     try:
-        predicciones = PrediccionesIA(latitude, longitude)
-        clima = predicciones.clima_service.obtener_clima_actual(latitude, longitude)
+        clima = ia.obtener_clima_actual(latitude, longitude)
         
         if clima["status"] != "ok":
             return {"error": "No se pudo obtener datos de clima"}
         
         return {
             "clima_actual": clima["actual"],
-            "alertas": predicciones.clima_service.alertas_clima(
+            "alertas": ia.obtener_alertas_clima(
                 clima["actual"],
                 clima["pronostico_7_dias"]
             ),
