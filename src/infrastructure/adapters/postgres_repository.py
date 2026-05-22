@@ -26,7 +26,11 @@ class PostgresSensorRepository(SensorRepositoryPort):
     def get_latest(self) -> SensorReading:
         db = SessionLocal()
         try:
-            db_reading = db.query(SensorReadingDB).order_by(SensorReadingDB.created_at.desc()).first()
+            db_reading = (
+                db.query(SensorReadingDB)
+                .order_by(SensorReadingDB.created_at.desc(), SensorReadingDB.id.desc())
+                .first()
+            )
             if db_reading:
                 return SensorReading(
                     id=db_reading.id,
@@ -43,7 +47,12 @@ class PostgresSensorRepository(SensorRepositoryPort):
     def get_history(self, limit: int = 24) -> List[SensorReading]:
         db = SessionLocal()
         try:
-            db_readings = db.query(SensorReadingDB).order_by(SensorReadingDB.created_at.desc()).limit(limit).all()
+            db_readings = (
+                db.query(SensorReadingDB)
+                .order_by(SensorReadingDB.created_at.desc(), SensorReadingDB.id.desc())
+                .limit(limit)
+                .all()
+            )
             return [
                 SensorReading(
                     id=r.id,

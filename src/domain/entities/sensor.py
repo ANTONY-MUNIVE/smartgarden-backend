@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional
 
@@ -9,7 +9,7 @@ class SensorReading:
     luminosidad: float
     humedad_ambiental: float
     id: Optional[int] = None
-    fecha: datetime = datetime.now()
+    fecha: datetime = field(default_factory=datetime.now)
 
     def to_dict(self):
         return {
