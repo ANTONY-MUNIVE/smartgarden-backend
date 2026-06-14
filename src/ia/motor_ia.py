@@ -94,9 +94,17 @@ def predecir(datos: DatosHuerto, ia: IAPort = Depends(get_ia_adapter)) -> Dict:
             ),
         )
 
+        confianza = resultado.get("confianza")
+        if confianza is None:
+            confianza = resultado.get("confidence")
+        if confianza is None:
+            confianza = 0.85 if resultado.get("calendario_riegos") else 0.5
+
         return {
             "humedad_futura_predicha": humedad_predicha,
             "mensaje": "Predicción generada por compatibilidad con el frontend.",
+            "confianza": confianza,
+            "confidence": confianza,
             **resultado,
         }
     except Exception as e:

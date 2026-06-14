@@ -86,6 +86,29 @@ class RecomendacionCreateRequest(BaseModel):
     icono: Optional[str] = '💡'
     confianza: Optional[float] = None
 
+
+def _validar_configuracion_umbrales(cfg, req: ConfigRequest):
+    valores = {}
+    for key, value in req.dict().items():
+        if value is not None:
+            valores[key] = value
+        elif cfg is not None and hasattr(cfg, key):
+            valores[key] = getattr(cfg, key)
+
+    for minimo, maximo in (
+        ('humedad_min', 'humedad_max'),
+        ('temp_min', 'temp_max'),
+        ('luz_min', 'luz_max'),
+    ):
+        valor_min = valores.get(minimo)
+        valor_max = valores.get(maximo)
+        if valor_min is not None and valor_max is not None and valor_min >= valor_max:
+            raise HTTPException(status_code=400, detail=f'{minimo} debe ser menor que {maximo}')
+
+    intervalo = valores.get('intervalo_sensor')
+    if intervalo is not None and intervalo <= 0:
+        raise HTTPException(status_code=400, detail='intervalo_sensor debe ser mayor que 0')
+
 # ─── Dependency injection ─────────────────────────────────────────────────────
 
 def get_user_uc():
@@ -268,6 +291,7 @@ async def save_config(req: ConfigRequest):
         if not cfg:
             cfg = SystemConfigDB()
             db.add(cfg)
+        _validar_configuracion_umbrales(cfg, req)
         for key, value in req.dict().items():
             if value is not None and hasattr(cfg, key):
                 setattr(cfg, key, value)

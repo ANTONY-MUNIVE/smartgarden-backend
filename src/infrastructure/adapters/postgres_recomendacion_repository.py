@@ -1,3 +1,4 @@
+import unicodedata
 from typing import List, Optional
 
 from sqlalchemy import func
@@ -29,6 +30,17 @@ class PostgresRecomendacionRepository(RecomendacionRepositoryPort):
 
         return icono[:10]
 
+    def _prioridad_rank(self, prioridad: Optional[str]) -> int:
+        texto = self._normalizar_texto(prioridad).lower()
+        texto = unicodedata.normalize('NFD', texto)
+        texto = ''.join(ch for ch in texto if unicodedata.category(ch) != 'Mn')
+        return {
+            'critico': 0,
+            'alta': 1,
+            'media': 2,
+            'baja': 3,
+        }.get(texto, 4)
+
     def _to_entity(self, r: RecomendacionDB) -> Recomendacion:
         return Recomendacion(
             id=r.id, prioridad=r.prioridad, accion=r.accion,
@@ -56,7 +68,11 @@ class PostgresRecomendacionRepository(RecomendacionRepositoryPort):
     def get_all(self) -> List[Recomendacion]:
         db = SessionLocal()
         try:
-            return [self._to_entity(r) for r in db.query(RecomendacionDB).order_by(RecomendacionDB.id).all()]
+            recomendaciones = [self._to_entity(r) for r in db.query(RecomendacionDB).order_by(RecomendacionDB.id).all()]
+            return sorted(
+                recomendaciones,
+                key=lambda rec: (self._prioridad_rank(rec.prioridad), rec.id or 0),
+            )
         finally:
             db.close()
 
